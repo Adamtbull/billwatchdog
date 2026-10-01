@@ -1,0 +1,17 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.getbillwatchdog/billwatch",
+  "description": "Current US streaming and VPN plan prices for AI agents: deals, filters and price history.",
+  "version": "1.0.0",
+  "websiteUrl": "https://getbillwatchdog.com",
+  "repository": {
+    "url": "https://github.com/Adamtbull/billwatchdog",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://getbillwatchdog.com/mcp"
+    }
+  ]
+}
