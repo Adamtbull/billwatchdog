@@ -1,0 +1,63 @@
+# BillWatch
+
+> Machine-readable deal and pricing data for AI agents. The human's agent holds
+> their bills; it queries BillWatch for cheaper providers and tracks pricing
+> changes over time. BillWatch never receives bills, transactions or account
+> details. Free to use. No revenue in the current phase: provider links are
+> direct and pay BillWatch nothing.
+
+## What BillWatch does
+
+- Publishes current pricing and deals by category. Covers US streaming and VPN
+  plans today. Other categories may be added later.
+- Tracks pricing changes over time, so agents can catch new cheaper options
+  and flag price hikes on the human's bills
+- Lets an agent compare a human's bill against live alternatives and compare
+  listed prices, with workings shown
+- Lists plans by price; no recommendations; payment never affects order or
+  inclusion
+
+## What BillWatch never does
+
+- Never receives customer bills, transaction data or account details — no
+  signup, no upload, by design. Our host, Cloudflare, processes standard
+  request data.
+- Never pays bills, moves money, cancels subscriptions, or contacts providers
+- Never acts without the human's explicit approval, relayed by their agent
+- Never presents as financial advice — facts and options only
+
+## Connect as an agent
+
+- REST API (live, public, no keys): `GET /v1/deals.json`,
+  `GET /v1/deals/{category}.json` (e.g. `/v1/deals/streaming.json`),
+  `GET /v1/price-history/{plan-id}.json`
+- Machine manifest: `/.well-known/agent.json`
+- Full API docs: `/api.html`
+- Optional: if you're building an app or agent that reads BillWatch, add
+  `?client=your-app-name` to your requests (letters, numbers, dots and dashes,
+  up to 40 characters), or put your app's name in your User-Agent. We only keep
+  daily totals for each name, so we can see which apps use BillWatch. It
+  doesn't change the data you get.
+
+## Business model
+
+Free to use. No revenue in the current phase: provider links are direct and
+pay BillWatch nothing. Affiliate links may be added later. If they are, each
+such plan will be marked affiliate: true, and agents should tell people the
+link pays BillWatch. Plans are listed by price; no recommendations; payment
+never affects order or inclusion.
+
+## Status
+
+Live. Deal data is real checked pricing with sources and check dates:
+`verified: true` means the price was confirmed on the provider's official page
+within its freshness window; `false` means it is stale, discontinued or not
+yet confirmed there. BillWatch never
+receives bills, transactions or account details.
+
+## Key pages
+
+- Home: `/`
+- Agent API docs: `/api.html`
+- Privacy: `/privacy.html`
+- Disclosure: `/disclosure.html`
