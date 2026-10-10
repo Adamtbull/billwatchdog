@@ -1,5 +1,5 @@
 {
-  "comment": "Append these entries to the include list of the live _routes.json. Keep every existing include and exclude entry exactly as it is. Do not add a root wildcard. The homepage needs no new entry: \"/\" is already in the live include list.",
+  "comment": "Append add_to_include to the include list of the live _routes.json. Keep every existing include and exclude entry exactly as it is. Do not add a root wildcard. The homepage needs no new entry: \"/\" is already in the live include list.",
   "add_to_include": [
     "/vpn",
     "/vpn/",
@@ -11,5 +11,7 @@
     "/affiliate-disclosure/",
     "/go/*"
   ],
-  "must_already_include": ["/"]
+  "must_already_include": ["/"],
+  "exclude_comment": "plans.html is served at /plans, and \"/plans/*\" can also match bare /plans. If \"/plans\" is NOT already in include, add it to exclude so /plans stays off the worker exactly as today (/plans/{id}/ still reaches it). If \"/plans\" IS already in include, add nothing.",
+  "add_to_exclude_unless_already_included": ["/plans"]
 }

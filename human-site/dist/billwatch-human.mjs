@@ -1,6 +1,6 @@
 // BillWatch human pages: worker module. GENERATED FILE, do not edit by hand.
 // Built by human-site/scripts/build.mjs from human-site/src/ (run `npm run build` in human-site/).
-// Source digest (sha256): ff3c183ee700c20c7e0400f01f1b85c2f88961dde03b80909d3b011eced941d0
+// Source digest (sha256): 66de18d5464e4eb42a3e683e91fc3e78cc6150c6b733fd5cdff473c1e40823e7
 // Defines one name, BillWatchHuman. No imports, no network requests, no secrets, no prices.
 // Wiring, homepage switch and paste-mode instructions: human-site/RUNBOOK.md.
 
@@ -424,8 +424,8 @@ function html(body, status=200) { return new Response(body,{status,headers:SECUR
 
 /**
  * Worker entry point for the human pages. The live _worker.js calls it first:
- *   const human = await BillWatchHuman.handleHumanRequest(request, env, ctx, { homepage: HUMAN_HOMEPAGE });
- *   if (human) return human;
+ *   const humanResponse = await BillWatchHuman.handleHumanRequest(request, env, ctx, { homepage: HUMAN_HOMEPAGE });
+ *   if (humanResponse) return humanResponse;
  * For any path it does not own it returns null straight away: no I/O, no bindings touched,
  * request body unread. The existing dispatch then handles that request exactly as before.
  * Options: homepage (true serves the human homepage at "/"; anything else leaves "/" alone),

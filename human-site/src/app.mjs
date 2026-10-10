@@ -14,8 +14,8 @@ function html(body, status=200) { return new Response(body,{status,headers:SECUR
 
 /**
  * Worker entry point for the human pages. The live _worker.js calls it first:
- *   const human = await BillWatchHuman.handleHumanRequest(request, env, ctx, { homepage: HUMAN_HOMEPAGE });
- *   if (human) return human;
+ *   const humanResponse = await BillWatchHuman.handleHumanRequest(request, env, ctx, { homepage: HUMAN_HOMEPAGE });
+ *   if (humanResponse) return humanResponse;
  * For any path it does not own it returns null straight away: no I/O, no bindings touched,
  * request body unread. The existing dispatch then handles that request exactly as before.
  * Options: homepage (true serves the human homepage at "/"; anything else leaves "/" alone),
