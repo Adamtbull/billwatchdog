@@ -1,0 +1,15 @@
+{
+  "comment": "Append these entries to the include list of the live _routes.json. Keep every existing include and exclude entry exactly as it is. Do not add a root wildcard. The homepage needs no new entry: \"/\" is already in the live include list.",
+  "add_to_include": [
+    "/vpn",
+    "/vpn/",
+    "/streaming",
+    "/streaming/",
+    "/plans/*",
+    "/compare/*",
+    "/affiliate-disclosure",
+    "/affiliate-disclosure/",
+    "/go/*"
+  ],
+  "must_already_include": ["/"]
+}

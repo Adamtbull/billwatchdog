@@ -1,5 +1,6 @@
 .local/
-build/
 node_modules/
 review/screenshots/
 review/*.html
+review/ui-checks.json
+review/browser-run.log

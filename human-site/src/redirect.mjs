@@ -1,4 +1,4 @@
-import { API_ORIGIN, normalizeDeals } from './data.mjs';
+import { loadDeals } from './data.mjs';
 
 const UPSERT = `INSERT INTO click_counts (plan_id, day, click_count)
 VALUES (?, ?, 1)
@@ -9,8 +9,9 @@ ON CONFLICT (plan_id, day) DO UPDATE SET click_count = click_count + 1`;
  * Every GET counts once. Refreshes, retrying clients, and bots can count again.
  * There is deliberately no fingerprinting, cookie, IP address, or referrer storage.
  * A failed/uncertain database write returns 503 and is never retried here.
+ * The plan list is read from this deployment's static assets (env.ASSETS), never fetched.
  */
-export async function handleGo(request, env = {}, { fetcher = fetch, now = Date } = {}) {
+export async function handleGo(request, env = {}, { now = Date } = {}) {
   const headers = {
     'Cache-Control': 'no-store',
     'Content-Type': 'text/plain; charset=utf-8',
@@ -35,11 +36,7 @@ export async function handleGo(request, env = {}, { fetcher = fetch, now = Date 
   if (!Number.isFinite(current.getTime())) return reply(503, 'Provider links are temporarily unavailable.');
   let deal;
   try {
-    const response = await fetcher(`${API_ORIGIN}/v1/deals.json`, {
-      headers: { Accept: 'application/json' }, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(10_000),
-    });
-    if (!response.ok) throw new Error('Upstream unavailable');
-    deal = normalizeDeals(await response.json(), current).deals.find((entry) => entry.id === id);
+    deal = (await loadDeals(env?.ASSETS, request.url, current)).deals.find((entry) => entry.id === id);
   } catch {
     return reply(503, 'The live plan list could not be checked. Please try again later.');
   }

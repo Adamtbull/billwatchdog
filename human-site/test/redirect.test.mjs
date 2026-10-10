@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { handleGo } from '../src/redirect.mjs';
+import { blockNetwork } from './helpers.mjs';
+
+blockNetwork();
 
 const now = new Date('2026-10-10T12:00:00Z');
 const deal = {
@@ -11,7 +14,9 @@ const deal = {
   checked_at: '2026-10-01', check_cadence_days: 14, last_check_status: 'ok', promo_ends: null,
   url: 'https://www.netflix.com/?affiliate=not-kept#tracking', source_url: 'https://www.netflix.com/ads-plan',
 };
-const source = (changes = {}) => async () => Response.json({ meta: { currency: 'USD' }, deals: [{ ...deal, ...changes }] });
+// env.ASSETS stand-ins: the plan list comes from static assets, never from the network.
+const assets = (respond) => ({ fetch: async () => respond() });
+const source = (changes = {}) => assets(() => Response.json({ meta: { currency: 'USD' }, deals: [{ ...deal, ...changes }] }));
 const request = (path = '/go/netflix-standard', method = 'GET') => new Request(`https://getbillwatchdog.com${path}`, { method });
 function database() {
   const calls = [];
@@ -25,7 +30,7 @@ test('known active GET records only plan/day before a plain provider redirect', 
   const req = new Request('https://getbillwatchdog.com/go/netflix-standard?url=https://evil.test&affiliate=x', {
     headers: { Cookie: 'private=secret', Referer: 'https://private.test', 'CF-Connecting-IP': '192.0.2.1' },
   });
-  const response = await handleGo(req, { BILLWATCH_CLICKS: db.binding }, { fetcher: source(), now });
+  const response = await handleGo(req, { BILLWATCH_CLICKS: db.binding, ASSETS: source() }, { now });
   assert.equal(response.status, 302);
   assert.equal(response.headers.get('Location'), 'https://www.netflix.com/');
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
@@ -41,7 +46,7 @@ test('redirect waits for durable database success', async () => {
   let release;
   let settled = false;
   const binding = { prepare: () => ({ bind: () => ({ run: () => new Promise((resolve) => { release = resolve; }) }) }) };
-  const pending = handleGo(request(), { BILLWATCH_CLICKS: binding }, { fetcher: source(), now }).then((response) => { settled = true; return response; });
+  const pending = handleGo(request(), { BILLWATCH_CLICKS: binding, ASSETS: source() }, { now }).then((response) => { settled = true; return response; });
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(settled, false);
   release({ success: true });
@@ -50,7 +55,7 @@ test('redirect waits for durable database success', async () => {
 
 test('HEAD returns the same target without recording a click', async () => {
   const db = database();
-  const response = await handleGo(request('/go/netflix-standard', 'HEAD'), { BILLWATCH_CLICKS: db.binding }, { fetcher: source(), now });
+  const response = await handleGo(request('/go/netflix-standard', 'HEAD'), { BILLWATCH_CLICKS: db.binding, ASSETS: source() }, { now });
   assert.equal(response.status, 302);
   assert.equal(await response.text(), '');
   assert.equal(db.calls.length, 0);
@@ -58,17 +63,17 @@ test('HEAD returns the same target without recording a click', async () => {
 
 test('unknown and inactive plans are 404 without a database write', async () => {
   const db = database();
-  assert.equal((await handleGo(request('/go/unknown'), { BILLWATCH_CLICKS: db.binding }, { fetcher: source(), now })).status, 404);
-  assert.equal((await handleGo(request(), { BILLWATCH_CLICKS: db.binding }, { fetcher: source({ status: 'discontinued' }), now })).status, 404);
+  assert.equal((await handleGo(request('/go/unknown'), { BILLWATCH_CLICKS: db.binding, ASSETS: source() }, { now })).status, 404);
+  assert.equal((await handleGo(request(), { BILLWATCH_CLICKS: db.binding, ASSETS: source({ status: 'discontinued' }) }, { now })).status, 404);
   assert.equal(db.calls.length, 0);
 });
 
 test('malformed IDs fail before a source fetch; other methods are 405', async () => {
-  const fetcher = async () => { throw new Error('Malformed request must not fetch'); };
+  const untouched = assets(() => { throw new Error('Malformed request must not read the plan list'); });
   for (const path of ['/go/', '/go/bad_id', '/go/%2Fother', '/go/netflix-standard/extra', '/go/' + 'a'.repeat(161)]) {
-    assert.equal((await handleGo(request(path), {}, { fetcher, now })).status, 400, path);
+    assert.equal((await handleGo(request(path), { ASSETS: untouched }, { now })).status, 400, path);
   }
-  const response = await handleGo(request('/go/netflix-standard', 'POST'), {}, { fetcher, now });
+  const response = await handleGo(request('/go/netflix-standard', 'POST'), { ASSETS: untouched }, { now });
   assert.equal(response.status, 405);
   assert.equal(response.headers.get('Allow'), 'GET, HEAD');
 });
@@ -78,20 +83,20 @@ test('missing, failing, or unconfirmed durable backend fails honestly with no re
     { prepare: () => ({ bind: () => ({ run: async () => ({ success: false }) }) }) },
     { prepare: () => ({ bind: () => ({ run: async () => undefined }) }) },
   ]) {
-    const response = await handleGo(request(), { BILLWATCH_CLICKS: binding }, { fetcher: source(), now });
+    const response = await handleGo(request(), { BILLWATCH_CLICKS: binding, ASSETS: source() }, { now });
     assert.equal(response.status, 503);
     assert.equal(response.headers.get('Location'), null);
     assert.equal(response.headers.get('Cache-Control'), 'no-store');
   }
 });
 
-test('affiliate, unrelated URL, failed upstream and invalid upstream schemas fail closed', async () => {
+test('affiliate, unrelated URL, failed or missing asset reads and invalid schemas fail closed', async () => {
   const db = database();
-  for (const fetcher of [source({ affiliate: true }), source({ url: 'https://evil.test/' }),
-    async () => new Response('', { status: 500 }), async () => Response.json({ deals: [] }),
-    async () => { throw new Error('Network offline'); },
+  for (const plans of [source({ affiliate: true }), source({ url: 'https://evil.test/' }),
+    assets(() => new Response('', { status: 500 })), assets(() => Response.json({ deals: [] })),
+    assets(() => { throw new Error('Asset read failed'); }), undefined, {},
   ]) {
-    const response = await handleGo(request(), { BILLWATCH_CLICKS: db.binding }, { fetcher, now });
+    const response = await handleGo(request(), { BILLWATCH_CLICKS: db.binding, ASSETS: plans }, { now });
     assert.equal(response.status, 503);
     assert.equal(response.headers.get('Location'), null);
   }
@@ -106,7 +111,7 @@ test('real SQLite migration and upsert persist aggregate totals across repeated 
     return { success: true };
   } }; } }; } };
   try {
-    for (let index = 0; index < 3; index++) assert.equal((await handleGo(request(), { BILLWATCH_CLICKS: binding }, { fetcher: source(), now })).status, 302);
+    for (let index = 0; index < 3; index++) assert.equal((await handleGo(request(), { BILLWATCH_CLICKS: binding, ASSETS: source() }, { now })).status, 302);
     const rows = sqlite.prepare('SELECT * FROM click_counts').all();
     assert.equal(rows.length, 1);
     assert.equal(rows[0].plan_id, 'netflix-standard');

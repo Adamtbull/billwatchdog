@@ -21,3 +21,5 @@ Everything is new under `human-site/`. Main runtime: `src/app.mjs` routes, `src/
 ## Remaining owner-controlled actions
 
 Locate/integrate actual Pages source; authorize and configure D1; inspect existing Pages routes and deployment settings; approve any preview/production deployment separately. Do not deploy, merge, create paid relationships, change access, or contact external agents without Adam's approval.
+
+The integration procedure for those steps (worker wiring, `env.ASSETS` data path, `_routes.json` entries, D1 setup, homepage switch, verification and rollback) is in `RUNBOOK.md`.

@@ -27,3 +27,22 @@ A standalone homepage preview was generated from the actual renderer and an actu
 ## Safety
 
 No production `/go/` endpoint was requested. No production counters, provider accounts, payments, deployment configuration, existing files, or agent endpoints were changed.
+
+# Integration verification — 2026-10-10
+
+Scope: wiring the human pages into the live Pages `_worker.js` (see `RUNBOOK.md`). No deployment, Cloudflare change or production request was made.
+
+## Passed
+
+- Node 22.22: `npm test`, 62 tests, zero failures. The 36 tests above are kept, adapted to the `env.ASSETS` data path; 26 are new.
+- Worker wiring: the two `RUNBOOK.md` code blocks were applied to a stand-in of the live dispatch (`test/fixtures/live-worker.mjs`, the shape given in the integration brief). 33 existing route and method cases, including `POST /mcp`, `POST /api/events`, `OPTIONS /mcp` and HEAD requests, were byte-identical to the unpatched stand-in in status, headers, body, existing handlers run, and `env.ASSETS` reads. Checked for the imported, pasted and source builds, with the homepage switch off and on (on: every case except `/`).
+- Mutation checks: making the human layer read `env.ASSETS` for every request, read the request body, own `/` regardless of the switch, fall through on an owned route, drop `/go/*` from the routes, or add a public-fetch fallback each made the suite fail.
+- Browser: Playwright 1.56 with Chromium 1194 and axe-core 4.10.3, using the repository's published feed mirror (updated 2026-10-01). All 7 pages at 1440 px and 390 px, zero WCAG 2.0/2.1 A and AA violations, keyboard skip link, numeric sorting with and without JavaScript, no browser console errors, and 88 table rows per viewport matching the feed's price, billing and promotion text exactly.
+- Defect found and fixed: on phones the table pages scrolled sideways (document 804 to 809 px wide in a 390 px viewport) because the absolutely positioned `.sr-only` labels inside each table escaped the scroll container. `.table-scroll` now sets `position: relative`; all pages measure 390 px.
+- CPU: about 0.05 to 2.1 ms per page render (warm, Node 22) with the 65-plan feed.
+
+## Not verified
+
+- The real `_worker.js`, `_routes.json` and deploy method, which are not in this repository. The stand-in follows the brief's dispatch description.
+- Cloudflare runtime behavior of `env.ASSETS` and D1. Both were exercised through stand-ins only, and nothing was deployed to a preview.
+- The live feed: this environment cannot reach getbillwatchdog.com from its shell, so checks used the repository mirror.

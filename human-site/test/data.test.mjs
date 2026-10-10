@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeDeals, isVerified, priceText, sortDeals, loadDeals, normalizeHistory, loadHistory } from '../src/data.mjs';
+import { blockNetwork } from './helpers.mjs';
+
+blockNetwork();
+const BASE = 'https://getbillwatchdog.com/vpn/';
+/** Minimal env.ASSETS stand-in: hands each Request to `respond` and records it. */
+const assetsWith = (respond, seen = []) => ({ seen, async fetch(request) { seen.push(request); return respond(request); } });
 
 const NOW = new Date('2026-10-10T12:00:00Z');
 const record = (changes = {}) => ({
@@ -83,16 +89,26 @@ test('sorting is numeric, deterministic, reversible and does not mutate source',
   assert.deepEqual(sortDeals([{ ...deals[0], billing: 'z-last' }, { ...deals[1], billing: 'a-first' }], 'billing').map((d) => d.id), ['small', 'big']);
 });
 
-test('loadDeals fetches the existing live endpoint without cached sample substitution', async () => {
-  let requested;
-  const result = await loadDeals(async (url, options) => {
-    requested = url;
-    assert.equal(options.cache, 'no-store');
-    return Response.json(payload(record()));
-  });
-  assert.equal(requested, 'https://getbillwatchdog.com/v1/deals.json');
+test('loadDeals reads the published /v1/deals.json from static assets, never the network', async () => {
+  const assets = assetsWith(() => Response.json(payload(record())));
+  const result = await loadDeals(assets, BASE, NOW);
+  assert.equal(assets.seen.length, 1);
+  const [request] = assets.seen;
+  assert.ok(request instanceof Request);
+  assert.equal(request.method, 'GET');
+  assert.equal(request.url, 'https://getbillwatchdog.com/v1/deals.json');
+  assert.equal(request.headers.get('Accept'), 'application/json');
+  assert.equal(request.redirect, 'manual');
   assert.equal(result.deals[0].id, record().id);
-  await assert.rejects(loadDeals(async () => new Response('', { status: 503 })), /503/);
+  await assert.rejects(loadDeals(assetsWith(() => new Response('', { status: 503 })), BASE, NOW), /503/);
+});
+
+test('loadDeals treats redirects, HTML fallbacks and a missing binding as failures', async () => {
+  await assert.rejects(loadDeals(assetsWith(() => new Response(null, { status: 308, headers: { Location: '/v1/deals' } })), BASE, NOW), /308/);
+  await assert.rejects(loadDeals(assetsWith(() => new Response('<!doctype html><p>index</p>', { headers: { 'Content-Type': 'text/html' } })), BASE, NOW));
+  for (const missing of [undefined, null, {}, { fetch: 'not a function' }]) {
+    await assert.rejects(loadDeals(missing, BASE, NOW), /env\.ASSETS/);
+  }
 });
 
 test('history shows original observations in date order without interpolation or rounding', () => {
@@ -106,17 +122,16 @@ test('history shows original observations in date order without interpolation or
   assert.throws(() => normalizeHistory({ history: [{ date: '2026-02-30', price_usd_monthly: 1 }] }));
 });
 
-test('loadHistory validates the plan ID before requesting a fixed API route', async () => {
-  let requested;
-  await loadHistory('netflix-standard', async (url) => {
-    requested = url;
-    return Response.json({ plan_id: 'netflix-standard', history: [] });
-  });
-  assert.equal(requested, 'https://getbillwatchdog.com/v1/price-history/netflix-standard.json');
-  await assert.rejects(loadHistory('../deals', async () => { throw new Error('Must not fetch'); }), /Invalid plan ID/);
+test('loadHistory validates the plan ID before reading a fixed asset path', async () => {
+  const assets = assetsWith(() => Response.json({ plan_id: 'netflix-standard', history: [] }));
+  await loadHistory('netflix-standard', assets, BASE);
+  assert.equal(assets.seen[0].url, 'https://getbillwatchdog.com/v1/price-history/netflix-standard.json');
+  const untouched = assetsWith(() => { throw new Error('Must not read'); });
+  await assert.rejects(loadHistory('../deals', untouched, BASE), /Invalid plan ID/);
+  assert.equal(untouched.seen.length, 0);
 });
 
 test('history verifies the actual published plan_id and rejects another plan’s observations', async () => {
  assert.throws(() => normalizeHistory({ id: 'example', history: [] }), /live history envelope/);
- await assert.rejects(loadHistory('netflix-standard', async () => Response.json({ plan_id: 'other-plan', history: [] })), /does not match/);
+ await assert.rejects(loadHistory('netflix-standard', assetsWith(() => Response.json({ plan_id: 'other-plan', history: [] })), BASE), /does not match/);
 });

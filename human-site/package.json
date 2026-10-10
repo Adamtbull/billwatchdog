@@ -8,6 +8,8 @@
     "start": "node scripts/serve.mjs",
     "test": "node --test test/*.test.mjs",
     "build": "node scripts/build.mjs",
-    "check:live": "node scripts/check-live.mjs"
+    "build:check": "node scripts/build.mjs --check",
+    "check:live": "node scripts/check-live.mjs",
+    "compare:existing": "node scripts/compare-existing-routes.mjs"
   }
 }
