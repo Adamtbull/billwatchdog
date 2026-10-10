@@ -1,0 +1,15 @@
+import { mkdir, cp, readFile, writeFile } from 'node:fs/promises';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+const output=resolve(root,'build');
+await mkdir(output+'/assets',{recursive:true});
+for(const name of ['billwatch-human.css','billwatch-human.js'])await cp(root+'/public/'+name,output+'/assets/'+name);
+await cp(root+'/src',output+'/src',{recursive:true});
+await cp(root+'/integration',output+'/integration',{recursive:true});
+await cp(root+'/functions',output+'/functions',{recursive:true});
+await cp(root+'/README.md',output+'/README.md');
+await cp(root+'/migrations',output+'/migrations',{recursive:true});
+await writeFile(output+'/BUILD-NOTE.txt','Human routes and their assets only. This build does not copy, replace, or deploy existing /v1/*, /mcp, /llms.txt, /agent.json, /api, or privacy/disclosure routes. Read README.md before integrating.\n');
+const size=(await readFile(output+'/assets/billwatch-human.js')).byteLength;
+console.log(`Built additive human-route package in ${output}. Client JavaScript: ${size} bytes. No deployment performed.`);

@@ -1,0 +1,5 @@
+.local/
+build/
+node_modules/
+review/screenshots/
+review/*.html
