@@ -1,5 +1,8 @@
-/** Live BillWatch API adapter. The published /v1 payloads are never modified. */
-export const API_ORIGIN = 'https://getbillwatchdog.com';
+/**
+ * Live BillWatch data adapter. Reads the deployment's own published /v1 files through the
+ * Pages static asset binding (env.ASSETS). It never makes a network request, so there is no
+ * self-subrequest back through the worker. The published /v1 payloads are never modified.
+ */
 const DAY = 86_400_000;
 const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const PROVIDER_DOMAINS = Object.freeze({
@@ -143,19 +146,28 @@ export function sortDeals(deals, key = 'price', direction = 'asc') {
   });
 }
 
-async function loadJson(path, fetcher, origin) {
-  const response = await fetcher(new URL(path, origin).href, {
+/**
+ * Read one published /v1 JSON file from static assets. `assets` is env.ASSETS; `base` is the
+ * incoming request URL (only the pathname is used to match the asset). `cache` and `signal`
+ * are deliberately not set: `cache` throws on Workers compatibility dates before 2024-11-11,
+ * and an asset read needs neither. Redirects are never followed (`redirect: 'manual'`): a
+ * redirect, like any non-2xx status, is treated as a failure.
+ */
+async function loadJson(path, assets, base) {
+  if (!assets || typeof assets.fetch !== 'function') {
+    throw new Error('The static asset binding (env.ASSETS) is not available.');
+  }
+  const response = await assets.fetch(new Request(new URL(path, base), {
+    method: 'GET',
+    redirect: 'manual',
     headers: { Accept: 'application/json' },
-    redirect: 'error',
-    cache: 'no-store',
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!response.ok) throw new Error(`BillWatch source returned HTTP ${response.status}.`);
+  }));
+  if (!response.ok) throw new Error(`BillWatch data returned HTTP ${response.status}.`);
   return response.json();
 }
 
-export async function loadDeals(fetcher = fetch, origin = API_ORIGIN, now = Date) {
-  return normalizeDeals(await loadJson('/v1/deals.json', fetcher, origin), now);
+export async function loadDeals(assets, base, now = Date) {
+  return normalizeDeals(await loadJson('/v1/deals.json', assets, base), now);
 }
 
 export function normalizeHistory(payload) {
@@ -169,9 +181,9 @@ export function normalizeHistory(payload) {
   return { ...payload, history, points: history };
 }
 
-export async function loadHistory(id, fetcher = fetch, origin = API_ORIGIN) {
+export async function loadHistory(id, assets, base) {
   if (typeof id !== 'string' || id.length > 160 || !ID_PATTERN.test(id)) throw new TypeError('Invalid plan ID.');
-  const result = normalizeHistory(await loadJson(`/v1/price-history/${id}.json`, fetcher, origin));
+  const result = normalizeHistory(await loadJson(`/v1/price-history/${id}.json`, assets, base));
   if (result.plan_id !== id) throw new TypeError('History plan ID does not match the requested plan.');
   return result;
 }

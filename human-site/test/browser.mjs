@@ -26,7 +26,8 @@ try {
   const now = new Date();
   const data = normalizeDeals(raw, now);
   report.source = { path: snapshotPath, feedUpdated: raw.meta.updated, count: raw.deals.length, evaluationTime: now.toISOString() };
-  const fetcher = async url => new URL(url).pathname === '/v1/deals.json' ? Response.json(raw) : new Response('No captured history is supplied', { status: 503 });
+  // Stand-in for env.ASSETS: the captured feed, and no history files.
+  const ASSETS = { fetch: async request => new URL(request.url).pathname === '/v1/deals.json' ? Response.json(raw) : new Response('No captured history is supplied', { status: 503 }) };
   server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, 'http://127.0.0.1');
@@ -34,10 +35,10 @@ try {
       if (url.pathname === '/assets/billwatch-human.css' || url.pathname === '/assets/billwatch-human.js') {
         const ext = url.pathname.endsWith('.css') ? 'css' : 'js';
         res.writeHead(200, { 'Content-Type': ext === 'css' ? 'text/css' : 'text/javascript' });
-        res.end(await readFile(root + `public/billwatch-human.${ext}`)); return;
+        res.end(await readFile(root + `public/assets/billwatch-human.${ext}`)); return;
       }
       if (url.pathname === '/favicon.ico') { res.writeHead(204); res.end(); return; }
-      const response = await handleHumanRequest(new Request(url), {}, { fetcher, now });
+      const response = await handleHumanRequest(new Request(url), { ASSETS }, undefined, { now, homepage: true });
       if (!response) { res.writeHead(404); res.end('Existing route is outside this local package.'); return; }
       let html = await response.text();
       if (response.headers.get('Content-Type')?.includes('text/html')) html = html.replace('<body>', '<body><div class="preview-banner">Local preview using a real captured API response. Source-check dates shown below. Outbound redirects disabled.</div>');
