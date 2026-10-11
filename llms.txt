@@ -28,6 +28,12 @@
 
 ## Connect as an agent
 
+- MCP server (live, public, no sign-up or key):
+  `https://getbillwatchdog.com/mcp` (Streamable HTTP, stateless).
+  Tools: `search_deals` (filter current plans) and `get_price_history`
+  (dated price snapshots; use `search_deals` to find plan IDs).
+  Send MCP JSON-RPC messages by HTTP POST. A normal HTTP GET returns
+  405 because this endpoint does not provide a server-initiated SSE stream.
 - REST API (live, public, no keys): `GET /v1/deals.json`,
   `GET /v1/deals/{category}.json` (e.g. `/v1/deals/streaming.json`),
   `GET /v1/price-history/{plan-id}.json`
